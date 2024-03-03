@@ -4,6 +4,7 @@ import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException
 
 def fetch_detail_page_URLs(driver, base_url, max_count=50):
     detail_page_URLs = []
@@ -43,17 +44,36 @@ def fetch_store_data(driver, url):
     except:
         building_name = ''
     try:
-        urls_element = driver.find_element(By.XPATH,'//*[@id="info-table"]/table/tbody/tr[12]/td/ul/li/a')
-        urls = urls_element.get_attribute('href')
-    except:
-        try:
-            urls_element = driver.find_element(By.CSS_SELECTOR,'a.sv-of.double')
-            urls = urls_element.get_attribute('href')
-        except:
-            urls =''
+        urls_element_sv = driver.find_element(By.CSS_SELECTOR,'a.sv-of.double')
+        urls_sv = urls_element_sv.get_attribute('href')
+    except NoSuchElementException:
+        urls_sv = ''
+    try:
+        urls_element_go_off = driver.find_element(By.CSS_SELECTOR,'a.url.go-off')
+        urls_go_off = urls_element_go_off.get_attribute('href')
+    except NoSuchElementException:
+        urls_go_off =''
 
-    ssl = 'TRUE' if urls.startswith('https') else 'FALSE'
+    urls =''
+    ssl = 'FALSE'
 
+    if urls_sv.startswith('https'):
+        urls = urls_sv
+        ssl = 'TRUE'
+    elif urls_go_off.startswith('https'):
+            urls = urls_go_off
+            ssl = 'TRUE'
+    elif urls_sv.startswith('http'):
+        urls = driver.current_url
+        ssl = 'FALSE'
+    elif urls_go_off.startswith('http'):
+        urls = driver.current_url
+        ssl = 'FALSE'
+    else:
+        urls = urls_sv if urls_sv else urls_go_off
+        ssl = 'FALSE'
+    if urls.startswith('https'):
+        ssl = 'TRUE'
 
     match = re.match(r"(.+?[都道府県])(.+?[市区町村])(.+)", address)
     if match:
@@ -78,6 +98,7 @@ data = []
 for url in detail_page_URLs:
     store_data = fetch_store_data(driver,url)
     data.append(store_data)
+
 
 df = pd.DataFrame(data, columns=["店舗名","電話番号","メールアドレス","都道府県","市区町村","番地","建物名","URL","SSL"])
 df.to_csv('1-2.csv', index=False, encoding='utf=8=sig')
